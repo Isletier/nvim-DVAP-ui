@@ -61,8 +61,11 @@ function M.thread_watch_focus(file_path, line_number)
     vim.fn.bufload(bufnr)
 
     vim.api.nvim_set_current_buf(bufnr)
+    local ok, result = pcall(vim.api.nvim_win_set_cursor, 0, { tonumber(line_number), 0 })
+    if not ok then
+        print("Warn: failed to set cursor to path:line")
+    end
 
-    vim.api.nvim_win_set_cursor(0, { tonumber(line_number), 0 })
     M.thread_watch_pos_cache[1] = file_path
     M.thread_watch_pos_cache[2] = line_number
 end
