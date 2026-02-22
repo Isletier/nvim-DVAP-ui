@@ -219,6 +219,16 @@ function M.set_thread_qf()
     vim.cmd(":copen")
 end
 
+local function copy_path_with_line()
+    local file = vim.api.nvim_buf_get_name(0)
+    if file == "" then return print("Buffer has no file") end
+
+    local line = vim.api.nvim_win_get_cursor(0)[1]
+
+    local result = string.format("%s:%d", file, line)
+    vim.fn.setreg('+', result)
+end
+
 
 -- Function to set up the plugin
 function M.setup(config)
@@ -279,12 +289,19 @@ function M.setup(config)
         {}
     )
 
+    vim.api.nvim_create_user_command(
+        'DVAPGetPathLine',
+        copy_path_with_line,
+        {}
+    )
+
     if M.config.set_default_keymaps then
         vim.keymap.set("n", "<leader>dc",  "<cmd>DVAPConnect<CR>")
         vim.keymap.set("n", "<leader>dd",  "<cmd>DVAPDisconnect<CR>")
         vim.keymap.set("n", "<leader>dw",  ":DVAPWatch ")
         vim.keymap.set("n", "<leader>df",  "<cmd>DVAPFocus<CR>")
         vim.keymap.set("n", "<leader>dr",  "<cmd>DVAPResetWatch<CR>")
+        vim.keymap.set("n", "<leader>dp",  "<cmd>DVAPGetPathLine<CR>")
 
         vim.keymap.set("n", "<leader>dqb", "<cmd>DVAPBreakpointList<CR>")
         vim.keymap.set("n", "<leader>dqt", "<cmd>DVAPThreadList<CR>")
