@@ -1,12 +1,16 @@
+local function get_default_threadline_hl()
+    vim.api.nvim_set_hl(0, "dvap_CursorLine", { bg = '#19435b' })
+    return "dvap_CursorLine"
+end
 
 local default_config = {
     default_host = "127.0.0.1",
     default_port = 9000,
-    debug_cursorline_hl = "DVAP_CursorLine",
+    debug_cursorline_hl = get_default_threadline_hl(),
     breakpoint_unconditional_sign = "DVAP_breakpoint_unconditional",
     breakpoint_conditional_sign = "DVAP_breakpoint_conditional",
     set_default_keymaps = true,
-    threadline_hl = "CursorLine"
+    threadline_hl = "Search"
 }
 
 local M = {
@@ -119,7 +123,7 @@ function M.start_ui_render()
     M.cursor_line_opt_cache = vim.opt.cursorline
     M.cursor_line_hl_cache = vim.api.nvim_get_hl(0, { name = 'CursorLine' })
 
-    vim.api.nvim_set_hl(0, 'CursorLine', M.DVAP_CursorLine_hl)
+    vim.api.nvim_set_hl(0, 'CursorLine', { link = M.config.debug_cursorline_hl })
 end
 
 function M.reset_ui()
@@ -171,7 +175,6 @@ function M.set_breakpoint_qf()
     local breakpoints = M.core.get_state().breakpoints
 
     local qf_items = {}
-    print(#breakpoints)
     for _, item in pairs(breakpoints) do
         table.insert(qf_items, {
             filename = item.file_path,
@@ -190,6 +193,7 @@ function M.set_breakpoint_qf()
 
     vim.fn.setqflist({}, ' ', { items = qf_items })
     M.QF_breakpoint_id_cache = vim.fn.getqflist({id = 0}).id
+    vim.cmd(":copen")
 end
 
 function M.set_thread_qf()
@@ -212,6 +216,7 @@ function M.set_thread_qf()
 
     vim.fn.setqflist({}, ' ', { items = qf_items })
     M.QF_breakpoint_id_cache = vim.fn.getqflist({id = 0}).id
+    vim.cmd(":copen")
 end
 
 
@@ -279,9 +284,9 @@ function M.setup(config)
         vim.keymap.set("n", "<leader>dd",  "<cmd>DVAPDisconnect<CR>")
         vim.keymap.set("n", "<leader>dw",  ":DVAPWatch ")
         vim.keymap.set("n", "<leader>df",  "<cmd>DVAPFocus<CR>")
-        vim.keymap.set("n", "<leader>dr",  "<cmd>DVAPResetWach<CR>")
+        vim.keymap.set("n", "<leader>dr",  "<cmd>DVAPResetWatch<CR>")
 
-        vim.keymap.set("n", "<leader>dqb", "<cmd>DVAPBreakpointsList<CR>")
+        vim.keymap.set("n", "<leader>dqb", "<cmd>DVAPBreakpointList<CR>")
         vim.keymap.set("n", "<leader>dqt", "<cmd>DVAPThreadList<CR>")
     end
 
