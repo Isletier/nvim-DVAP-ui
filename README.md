@@ -1,17 +1,17 @@
 ## NVIM-DVAP-UI
 
-This is DVAP client ui implementation for Neovim.
+This is the DVAP client UI implementation for Neovim.
 
-**WARNING** — this implementation is very WIP and partially vibecoded; DON'T use it unless you want to participate in its development.
+WARNING — This implementation is a work in progress and partially "vibecoded"; DON'T use it unless you intend to participate in its development.
 
 ## References
 
-- https://github.com/Isletier/DVAP - adapter for GDB (please, read this one)
-- https://github.com/Isletier/nvim-DVAP - core client part for this plugin
+- https://github.com/Isletier/DVAP - Adapter for GDB (please read this first).
+- https://github.com/Isletier/nvim-DVAP - The core client component for this plugin.
 
 ## Installation
 
-this is for packer:
+Example for packer.nvim:
 
 ```lua
 use {
@@ -22,83 +22,84 @@ use {
 }
 ```
 
+I have no idea how it's done for other package managers, but I'm sure you will figure it out.
+
 ## Configuration
 
 ```lua
 
 require("nvim-dvap-ui").setup() -- default setup
 
--- all of the configuration with defaults
-    require("nvim-dvap-ui").setup({
-    -- default host that will be emmited for connect cmd
+-- All configuration options with their defaults:
+require("nvim-dvap-ui").setup({
+    -- Default host suggested for the connect command
     default_host = "127.0.0.1",
 
-    -- default port that will be emmited for connect cmd
+    -- Default port suggested for the connect command
     default_port = 9000,
 
-    -- highlight for the cursor line to mark start of "debug" mode
+    -- Highlight for the cursor line to mark the start of "debug" mode
     debug_cursorline_hl = get_default_threadline_hl(),
     
-    -- left column sign to mark breakpoint position
+    -- Left column sign to mark an unconditional breakpoint position
     breakpoint_unconditional_sign = "DVAP_breakpoint_unconditional",
-    --  vim.fn.sign_define("DVAP_breakpoint_unconditional", { text = "B", texthl = "Character" })
+    -- vim.fn.sign_define("DVAP_breakpoint_unconditional", { text = "B", texthl = "Character" })
 
-
-    -- left column sign to mark conditional breakpoint position
-    -- Note: separation of condiitonal|uncoditional breakpoints is not guarantied, it fallbacks to unconditional one
+    -- Left column sign to mark a conditional breakpoint position
+    -- Note: Separation of conditional/unconditional breakpoints is not guaranteed; it may fallback to unconditional.
     breakpoint_conditional_sign = "DVAP_breakpoint_conditional",
-    -- vim.fn.sign_define("DVAP_breakpoint_conditional",   { text = "C", texthl = "Character" })
+    -- vim.fn.sign_define("DVAP_breakpoint_conditional", { text = "C", texthl = "Character" })
 
-    -- to set default keymaps, or not
+    -- Whether to set default keymaps
     set_default_keymaps = true,
+    -- Default mappings:
     -- vim.keymap.set("n", "<leader>dc",  "<cmd>DVAPConnect<CR>")
     -- vim.keymap.set("n", "<leader>dd",  "<cmd>DVAPDisconnect<CR>")
     -- vim.keymap.set("n", "<leader>dw",  ":DVAPWatch ")
     -- vim.keymap.set("n", "<leader>df",  "<cmd>DVAPFocus<CR>")
     -- vim.keymap.set("n", "<leader>dr",  "<cmd>DVAPResetWatch<CR>")
     -- vim.keymap.set("n", "<leader>dp",  "<cmd>DVAPGetPathLine<CR>")
-
     -- vim.keymap.set("n", "<leader>dqb", "<cmd>DVAPBreakpointList<CR>")
     -- vim.keymap.set("n", "<leader>dqt", "<cmd>DVAPThreadList<CR>")
 
-    -- Highlight group to mark current threads positions
+    -- Highlight group to mark current thread positions
     threadline_hl = "Search"
 })
 ```
 
-## Usage, commands
+## Usage & Commands
 
 - **DVAPConnect**
 
-Starts ui prompt for debug session host:port to attach.
+Opens a UI prompt to enter the host and port for the debug session.
 
 - **DVAPDisconnect**
 
-Disconnects from the session.
+Disconnects from the current session.
 
 - **DVAPWatch {thread_num|tid}**
 
-Sets wathced thread, changes cursor position when threads position update occures
+Sets the watched thread. This automatically moves the cursor when the thread's position is updated.
 
-Note: this is no-way related to switching active thread in your debugger, and doesn't meant to be.
+Note: This does not switch the active thread in your debugger.
 
 - **DVAPFocus**
 
-Changes cursor position to currently watched num.
+Moves the cursor to the position of the currently watched thread.
 
 - **DVAPResetWatch**
 
-Resets thread watch
+Clears the current thread watch.
 
 - **DVAPGetPathLine**
 
-Helper command to paste cuurent `path:line` to your systems copy buffer.
+A helper command that copies the current path:line to the system clipboard.
 
 - **DVAPBreakpointList**
 
-List all breakpoints and their positions in the QF.
+Lists all breakpoints and their positions in the Quickfix (QF) list.
 
 - **DVAPThreadList**
 
-List all threads and their positions in the QF.
+Lists all threads and their positions in the Quickfix (QF) list.
 
