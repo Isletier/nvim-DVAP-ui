@@ -26,7 +26,6 @@ local M = {
     QF_breakpoint_id_cache = nil,
 
     DVAP_namespace = vim.api.nvim_create_namespace("dvap"),
-    DVAP_CursorLine_hl = { bg = '#19435b' },
 
     config = default_config
 }
@@ -35,10 +34,14 @@ function M.highlight_current_line(thread_num, file_path, line_number)
     local bufnr = vim.fn.bufadd(file_path)
     vim.fn.bufload(bufnr)
 
-    vim.api.nvim_buf_set_extmark(bufnr, M.DVAP_namespace, line_number - 1, 0, {
+    local ok, result = pcall(vim.api.nvim_buf_set_extmark, bufnr, M.DVAP_namespace, line_number - 1, 0, {
         line_hl_group = M.config.threadline_hl,
         hl_mode = "combine",
     })
+
+    if not ok then
+        print("Warn: failed to find thread file location")
+    end
 
     M.thread_buf_cache[thread_num] = bufnr
 end
@@ -162,6 +165,7 @@ end
 function M.set_watch_thread(thread_num)
     M.thread_watch_num = thread_num.fargs[1]
     M.thread_watch_pos_cache = { "", 0 }
+    M.try_focus()
 end
 
 
@@ -229,6 +233,11 @@ local function copy_path_with_line()
     vim.fn.setreg('+', result)
 end
 
+function M.force_focus()
+    M.thread_watch_pos_cache = { "", 0 }
+    M.try_focus()
+end
+
 
 -- Function to set up the plugin
 function M.setup(config)
@@ -267,7 +276,7 @@ function M.setup(config)
 
     vim.api.nvim_create_user_command(
         'DVAPFocus',
-        M.try_focus,
+        M.force_focus,
         {}
     )
 
