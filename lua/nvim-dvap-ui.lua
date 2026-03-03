@@ -143,25 +143,28 @@ function M.reset_ui()
     M.thread_watch_pos_cache = { "", 0 }
     M.thread_buf_cache = {}
 
-    assert(M.cursor_line_opt_cache ~= nil and M.cursor_line_hl_cache ~= nil)
+    --assert(M.cursor_line_opt_cache ~= nil and M.cursor_line_hl_cache ~= nil)
     vim.opt.cursorline = M.cursor_line_opt_cache
-    vim.api.nvim_set_hl(0, 'CursorLine', M.cursor_line_hl_cache)
+    if M.cursor_line_hl_cache then
+        vim.api.nvim_set_hl(0, 'CursorLine', M.cursor_line_hl_cache)
+    end
 
     vim.fn.sign_unplace("DVAP_sign_group")
 end
 
 function M.connectCMD()
     vim.ui.input({
-        prompt = 'Enter DVAP endpoint HOST:PORT: ',
-        default = M.config.default_host .. ':' .. M.config.default_port,
+        prompt = 'Enter DVAP endpoint {host}:{port}/events ',
+        default = M.config.default_host .. ':' .. M.config.default_port .. "/events",
     }, function(endpoint)
-        local host, port = string.match(endpoint, "([^:]+):(%d+)")
+        local host, port = string.match(endpoint, "([^:]+):(%d+)/events$")
 
         if not host or not port then
-            return nil, "Invalid endpoint format. Use HOST:PORT"
+            print("\nError: Endpoint must follow the format 'host:port/events'")
+            return nil, "Error: Endpoint must follow the format 'host:port/events'"
         end
 
-        M.core.connect("/", host, tonumber(port))
+        M.core.connect(endpoint)
     end)
 end
 

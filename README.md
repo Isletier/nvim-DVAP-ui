@@ -2,7 +2,7 @@
 
 This is the DVAP client UI implementation for Neovim.
 
-WARNING — This implementation is a work in progress and partially "vibecoded"; DON'T use it unless you intend to participate in its development.
+WARNING — This implementation is a work in progress; DON'T use it unless you intend to participate in its development.
 
 ## References
 
