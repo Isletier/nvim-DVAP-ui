@@ -17,8 +17,8 @@ local M = {
     core = nil,
 
     thread_buf_cache = {},
-    thread_watch_num = {},
     thread_watch_pos_cache = { "", 0 },
+    thread_follow_selected = false,
 
     cursor_line_opt_cache = nil,
     cursor_line_hl_cache = nil,
@@ -71,20 +71,18 @@ function M.thread_watch_focus(file_path, line_number)
 end
 
 function M.try_focus()
-    local threads = M.core.get_state().threads
+    local state = M.core.get_state()
 
-    if M.thread_watch_num ~= nil and threads[M.thread_watch_num] ~= nil then
-        M.thread_watch_focus(threads[M.thread_watch_num]["file_path"], threads[M.thread_watch_num]["line"])
+    if state.selected == nil then
         return
     end
 
-    --try tid
-    for _, thread in pairs(threads) do
-        if thread["tid"] == M.thread_watch_num then
-            M.thread_watch_focus(thread["file_path"], thread["line"])
-        end
-    end
+    local threads = state.threads
 
+    if threads[state.selected] ~= nil then
+        M.thread_watch_focus(threads[state.selected]["file_path"], threads[state.selected]["line"])
+        return
+    end
 end
 
 function M.render(state)
@@ -122,7 +120,9 @@ function M.render(state)
         end
     end
 
-    M.try_focus()
+    if M.thread_follow_selected then
+        M.try_focus()
+    end
 end
 
 function M.start_ui_render()
@@ -168,18 +168,10 @@ function M.connectCMD()
     end)
 end
 
-function M.set_watch_thread(thread_num)
-    M.thread_watch_num = thread_num.fargs[1]
-    M.thread_watch_pos_cache = { "", 0 }
-    M.try_focus()
+function M.Toggle_follow()
+    M.thread_follow_selected = not M.thread_follow_selected
+    M.force_focus()
 end
-
-
-function M.Reset_watch_thread()
-    M.thread_watch_num = nil
-    M.thread_watch_pos_cache = { "", 0 }
-end
-
 
 function M.set_breakpoint_qf()
     local breakpoints = M.core.get_state().breakpoints
@@ -275,20 +267,14 @@ function M.setup(config)
     )
 
     vim.api.nvim_create_user_command(
-        'DVAPWatch',
-        M.set_watch_thread,
-        { nargs = 1 }
-    )
-
-    vim.api.nvim_create_user_command(
         'DVAPFocus',
         M.force_focus,
         {}
     )
 
     vim.api.nvim_create_user_command(
-        'DVAPResetWatch',
-        M.Reset_watch_thread,
+        'DVAPToggleFollow',
+        M.Toggle_follow,
         {}
     )
 
@@ -313,9 +299,8 @@ function M.setup(config)
     if M.config.set_default_keymaps then
         vim.keymap.set("n", "<leader>dc",  "<cmd>DVAPConnect<CR>")
         vim.keymap.set("n", "<leader>dd",  "<cmd>DVAPDisconnect<CR>")
-        vim.keymap.set("n", "<leader>dw",  ":DVAPWatch ")
+        vim.keymap.set("n", "<leader>dt",  "<cmd>DVAPToggleFollow<CR>")
         vim.keymap.set("n", "<leader>df",  "<cmd>DVAPFocus<CR>")
-        vim.keymap.set("n", "<leader>dr",  "<cmd>DVAPResetWatch<CR>")
         vim.keymap.set("n", "<leader>dp",  "<cmd>DVAPGetPathLine<CR>")
 
         vim.keymap.set("n", "<leader>dqb", "<cmd>DVAPBreakpointList<CR>")
