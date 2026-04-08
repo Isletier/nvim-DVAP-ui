@@ -33,8 +33,14 @@ local M = {
 function M.highlight_current_line(thread_num, file_path, line_number)
     local bufnr = vim.fn.bufadd(file_path)
     vim.fn.bufload(bufnr)
+    local ok
 
-    local ok, result = pcall(vim.api.nvim_buf_set_extmark, bufnr, M.DVAP_namespace, line_number - 1, 0, {
+    ok, line_number = pcall(tonumber, line_number)
+    if not ok then
+        print("Warn: failed to find thread file location")
+    end
+
+    ok, _ = pcall(vim.api.nvim_buf_set_extmark, bufnr, M.DVAP_namespace, line_number - 1, 0, {
         line_hl_group = M.config.threadline_hl,
         hl_mode = "combine",
     })
