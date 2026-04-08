@@ -38,6 +38,7 @@ function M.highlight_current_line(thread_num, file_path, line_number)
     ok, line_number = pcall(tonumber, line_number)
     if not ok then
         print("Warn: failed to find thread file location")
+        return;
     end
 
     ok, _ = pcall(vim.api.nvim_buf_set_extmark, bufnr, M.DVAP_namespace, line_number - 1, 0, {
@@ -47,6 +48,7 @@ function M.highlight_current_line(thread_num, file_path, line_number)
 
     if not ok then
         print("Warn: failed to find thread file location")
+        return
     end
 
     M.thread_buf_cache[thread_num] = bufnr
