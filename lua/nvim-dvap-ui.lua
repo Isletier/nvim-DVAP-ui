@@ -182,9 +182,7 @@ function M.set_breakpoint_qf()
         table.insert(qf_items, {
             filename = item.file_path,
             lnum = item.line,
-            text = string.format("[%s] Enabled: %s, Cond: %s",
-                                 item.type_str, item.enabled, item.nonconditional),
-            type = item.type_str:sub(1,1):upper() -- Опционально: первая буква типа (E, W, etc.)
+            text = string.format("Enabled: %s, Cond: %s", item.enabled, item.nonconditional),
         })
     end
 
