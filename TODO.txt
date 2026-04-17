@@ -4,8 +4,9 @@ add additional highlight for cursor line to distinguish follow and non-follow mo
 add additional highlight for 'losted' thread
 change default port to 56789
 add virtual text inline thread info?
+add periodical polling on current port to auto reconnect?
+add follow mode as default, as well as an option to configure this
 
 think about inserting stacktrace of current thread to qf, additional highlight for each call point?
 think about path substitution file/setting? Research how DAP handles remote debugging in the case of different paths
-add periodical polling on current port to auto reconnect?
 
