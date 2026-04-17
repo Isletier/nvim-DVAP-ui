@@ -1,42 +1,87 @@
-local function get_default_threadline_hl()
-    vim.api.nvim_set_hl(0, "dvap_CursorLine", { bg = '#19435b' })
-    return "dvap_CursorLine"
+local function setup_default_highlights()
+    vim.api.nvim_set_hl(0, "dvap_CursorLine",       { bg = '#19435b' })
+    vim.api.nvim_set_hl(0, "dvap_FollowCursorLine", { bg = '#194b2e' })
+    vim.api.nvim_set_hl(0, "dvap_ThreadLine",       { bg = '#2a4a2a' })
+    vim.api.nvim_set_hl(0, "dvap_SelectedThread",   { bg = '#1a5a1a' })
+    vim.api.nvim_set_hl(0, "dvap_LostThread",       { bg = '#4a3a1a', fg = '#888888' })
 end
+
+setup_default_highlights()
 
 local default_config = {
     default_host = "127.0.0.1",
-    default_port = 9000,
-    debug_cursorline_hl = get_default_threadline_hl(),
+    default_port = 56789,
+
+    debug_cursorline_hl  = "dvap_CursorLine",
+    follow_cursorline_hl = "dvap_FollowCursorLine",
+
     breakpoint_unconditional_sign = "DVAP_breakpoint_unconditional",
-    breakpoint_conditional_sign = "DVAP_breakpoint_conditional",
+    breakpoint_conditional_sign   = "DVAP_breakpoint_conditional",
+
     set_default_keymaps = true,
-    threadline_hl = "Search"
+
+    threadline_hl          = "dvap_ThreadLine",
+    selected_threadline_hl = "dvap_SelectedThread",
+    lost_threadline_hl     = "dvap_LostThread",
+
+    virt_text_thread_info = true,
+
+    follow_mode = true,
 }
 
 local M = {
     core = nil,
 
-    thread_buf_cache = {},
-    thread_watch_pos_cache = { "", 0 },
-    thread_follow_selected = false,
+    thread_buf_cache        = {},
+    thread_watch_pos_cache  = { "", 0 },
+    thread_follow_selected  = false,
 
     cursor_line_opt_cache = nil,
-    cursor_line_hl_cache = nil,
+    cursor_line_hl_cache  = nil,
 
     QF_breakpoint_id_cache = nil,
+    QF_thread_id_cache     = nil,
 
     DVAP_namespace = vim.api.nvim_create_namespace("dvap"),
 
     config = default_config
 }
 
-function M.highlight_current_line(thread_num, file_path, line_number)
-    local bufnr = vim.fn.bufadd(file_path)
+function M.update_cursorline_hl()
+    local hl = M.thread_follow_selected
+        and M.config.follow_cursorline_hl
+        or  M.config.debug_cursorline_hl
+    vim.api.nvim_set_hl(0, 'CursorLine', { link = hl })
+end
+
+function M.highlight_current_line(thread_id, thread, is_selected)
+    local bufnr = vim.fn.bufadd(thread.file_path)
     vim.fn.bufload(bufnr)
 
-    ok, _ = pcall(vim.api.nvim_buf_set_extmark, bufnr, M.DVAP_namespace, line_number - 1, 0, {
-        line_hl_group = M.config.threadline_hl,
-        hl_mode = "combine",
+    local hl_group
+    if thread.lost then
+        hl_group = M.config.lost_threadline_hl
+    elseif is_selected then
+        hl_group = M.config.selected_threadline_hl
+    else
+        hl_group = M.config.threadline_hl
+    end
+
+    local virt_text = nil
+    if M.config.virt_text_thread_info then
+        local label = string.format(" [%s tid:%s%s%s]",
+            thread_id,
+            thread.tid,
+            is_selected and " ◀selected" or "",
+            thread.lost  and " ⚠lost"     or "")
+        virt_text = { { label, "Comment" } }
+    end
+
+    local ok, _ = pcall(vim.api.nvim_buf_set_extmark, bufnr, M.DVAP_namespace, thread.line - 1, 0, {
+        line_hl_group = hl_group,
+        hl_mode       = "combine",
+        virt_text     = virt_text,
+        virt_text_pos = "eol",
     })
 
     if not ok then
@@ -44,7 +89,7 @@ function M.highlight_current_line(thread_num, file_path, line_number)
         return
     end
 
-    M.thread_buf_cache[thread_num] = bufnr
+    M.thread_buf_cache[thread_id] = bufnr
 end
 
 function M.clear_previous_highlight(bufnr)
@@ -62,7 +107,7 @@ function M.thread_watch_focus(file_path, line_number)
     vim.fn.bufload(bufnr)
 
     vim.api.nvim_set_current_buf(bufnr)
-    local ok, result = pcall(vim.api.nvim_win_set_cursor, 0, { tonumber(line_number), 0 })
+    local ok, _ = pcall(vim.api.nvim_win_set_cursor, 0, { tonumber(line_number), 0 })
     if not ok then
         print("Warn: failed to set cursor to path:line")
     end
@@ -82,42 +127,32 @@ function M.try_focus()
 
     if threads[state.selected] ~= nil then
         M.thread_watch_focus(threads[state.selected]["file_path"], threads[state.selected]["line"])
-        return
     end
 end
 
 function M.render(state)
-    local threads = state.threads
+    local threads    = state.threads
     local breakpoints = state.breakpoints
 
-    for _, num in pairs(M.thread_buf_cache) do
-        M.clear_previous_highlight(num)
+    for _, bufnr in pairs(M.thread_buf_cache) do
+        M.clear_previous_highlight(bufnr)
     end
+    M.thread_buf_cache = {}
 
-    for num, thread in pairs(threads) do
-        M.highlight_current_line(num, thread["file_path"], thread["line"])
+    for id, thread in pairs(threads) do
+        M.highlight_current_line(id, thread, id == state.selected)
     end
 
     vim.fn.sign_unplace("DVAP_sign_group")
     for _, breakpoint in pairs(breakpoints) do
-        local b_sign = nil
-
-        if breakpoint.nonconditional and breakpoint.enabled then
-            b_sign = M.config.breakpoint_unconditional_sign
-        else
-            b_sign = M.config.breakpoint_conditional_sign
-        end
+        local b_sign = (breakpoint.nonconditional and breakpoint.enabled)
+            and M.config.breakpoint_unconditional_sign
+            or  M.config.breakpoint_conditional_sign
 
         local bufnr = vim.fn.bufnr(breakpoint.file_path)
         if bufnr ~= -1 then
             vim.fn.bufload(bufnr)
-            vim.fn.sign_place(
-                0,
-                "DVAP_sign_group",
-                b_sign,
-                bufnr,
-                { lnum = breakpoint.line }
-            )
+            vim.fn.sign_place(0, "DVAP_sign_group", b_sign, bufnr, { lnum = breakpoint.line })
         end
     end
 
@@ -128,23 +163,20 @@ end
 
 function M.start_ui_render()
     M.cursor_line_opt_cache = vim.opt.cursorline
-    M.cursor_line_hl_cache = vim.api.nvim_get_hl(0, { name = 'CursorLine' })
-
-    vim.api.nvim_set_hl(0, 'CursorLine', { link = M.config.debug_cursorline_hl })
+    M.cursor_line_hl_cache  = vim.api.nvim_get_hl(0, { name = 'CursorLine' })
+    M.thread_follow_selected = M.config.follow_mode
+    M.update_cursorline_hl()
 end
 
 function M.reset_ui()
     local all_buffers = vim.api.nvim_list_bufs()
-
     for _, bufnr in ipairs(all_buffers) do
         vim.api.nvim_buf_clear_namespace(bufnr, M.DVAP_namespace, 0, -1)
     end
 
-    M.thread_watch_num = nil
     M.thread_watch_pos_cache = { "", 0 }
-    M.thread_buf_cache = {}
+    M.thread_buf_cache       = {}
 
-    --assert(M.cursor_line_opt_cache ~= nil and M.cursor_line_hl_cache ~= nil)
     vim.opt.cursorline = M.cursor_line_opt_cache
     if M.cursor_line_hl_cache then
         vim.api.nvim_set_hl(0, 'CursorLine', M.cursor_line_hl_cache)
@@ -155,23 +187,36 @@ end
 
 function M.connectCMD()
     vim.ui.input({
-        prompt = 'Enter DVAP endpoint {host}:{port}/events ',
+        prompt  = 'Enter DVAP endpoint {host}:{port}/events ',
         default = M.config.default_host .. ':' .. M.config.default_port .. "/events",
     }, function(endpoint)
-        local host, port = string.match(endpoint, "([^:]+):(%d+)/events$")
+        if not endpoint then return end
 
+        local host, port = string.match(endpoint, "([^:]+):(%d+)/events$")
         if not host or not port then
             print("\nError: Endpoint must follow the format 'host:port/events'")
-            return nil, "Error: Endpoint must follow the format 'host:port/events'"
+            return
         end
 
         M.core.connect(endpoint)
     end)
 end
 
+function M.disconnect_cmd()
+    M.core.disconnect()
+end
+
 function M.Toggle_follow()
+    if not M.core or not M.core.client then
+        vim.notify("[DVAP-ui] Debug session is not connected, ignoring", vim.log.levels.INFO)
+        return
+    end
+
     M.thread_follow_selected = not M.thread_follow_selected
-    M.force_focus()
+    M.update_cursorline_hl()
+    if M.thread_follow_selected then
+        M.force_focus()
+    end
 end
 
 function M.set_breakpoint_qf()
@@ -181,42 +226,47 @@ function M.set_breakpoint_qf()
     for _, item in pairs(breakpoints) do
         table.insert(qf_items, {
             filename = item.file_path,
-            lnum = item.line,
-            text = string.format("Enabled: %s, Cond: %s", item.enabled, item.nonconditional),
+            lnum     = item.line,
+            text     = string.format("Enabled: %s, NoCond: %s", item.enabled, item.nonconditional),
         })
     end
 
-    local qf_id = vim.fn.getqflist({id = 0}).id
+    local qf_id = vim.fn.getqflist({ id = 0 }).id
     if M.QF_breakpoint_id_cache ~= nil and M.QF_breakpoint_id_cache == qf_id then
         vim.fn.setqflist({}, 'u', { id = qf_id, items = qf_items })
         return
     end
 
     vim.fn.setqflist({}, ' ', { items = qf_items })
-    M.QF_breakpoint_id_cache = vim.fn.getqflist({id = 0}).id
+    M.QF_breakpoint_id_cache = vim.fn.getqflist({ id = 0 }).id
     vim.cmd(":copen")
 end
 
 function M.set_thread_qf()
-    local threads = M.core.get_state().threads
+    local state   = M.core.get_state()
+    local threads = state.threads
 
     local qf_items = {}
-    for _, item in pairs(threads) do
+    for id, item in pairs(threads) do
+        local flags = ""
+        if id == state.selected then flags = flags .. " [SELECTED]" end
+        if item.lost            then flags = flags .. " [LOST]"     end
+
         table.insert(qf_items, {
             filename = item.file_path,
-            lnum = item.line,
-            text = string.format("Tid: %s", item.tid),
+            lnum     = item.line,
+            text     = string.format("%s tid:%s%s", id, item.tid, flags),
         })
     end
 
-    local qf_id = vim.fn.getqflist({id = 0}).id
-    if M.QF_breakpoint_id_cache ~= nil and M.QF_breakpoint_id_cache == qf_id then
+    local qf_id = vim.fn.getqflist({ id = 0 }).id
+    if M.QF_thread_id_cache ~= nil and M.QF_thread_id_cache == qf_id then
         vim.fn.setqflist({}, 'u', { id = qf_id, items = qf_items })
         return
     end
 
     vim.fn.setqflist({}, ' ', { items = qf_items })
-    M.QF_breakpoint_id_cache = vim.fn.getqflist({id = 0}).id
+    M.QF_thread_id_cache = vim.fn.getqflist({ id = 0 }).id
     vim.cmd(":copen")
 end
 
@@ -224,76 +274,45 @@ local function copy_path_with_line()
     local file = vim.api.nvim_buf_get_name(0)
     if file == "" then return print("Buffer has no file") end
 
-    local line = vim.api.nvim_win_get_cursor(0)[1]
-
+    local line   = vim.api.nvim_win_get_cursor(0)[1]
     local result = string.format("%s:%d", file, line)
     vim.fn.setreg('+', result)
 end
 
 function M.force_focus()
+    --note: double check in case of toggle follow mode, should be better
+    if not M.core or not M.core.client then
+        vim.notify("[DVAP-ui] Debug session is not connected, ignoring", vim.log.levels.INFO)
+        return
+    end
+
     M.thread_watch_pos_cache = { "", 0 }
     M.try_focus()
 end
 
-
--- Function to set up the plugin
 function M.setup(config)
     local ok
     ok, M.core = pcall(require, "nvim-dvap")
     if not ok then
-        vim.notify("nvim-DVAP core dont found", 4)
+        vim.notify("nvim-DVAP core not found", vim.log.levels.ERROR)
         return
     end
 
     M.config = vim.tbl_deep_extend("force", default_config, config or {})
 
     M.core.setup({
-        on_connected    = M.start_ui_render,
-        on_disconnected = M.reset_ui,
-        on_state_updated = M.render
+        on_connected     = M.start_ui_render,
+        on_disconnected  = M.reset_ui,
+        on_state_updated = M.render,
     })
 
-    vim.api.nvim_create_user_command(
-        'DVAPConnect',
-        M.connectCMD,
-        {}
-    )
-
-    vim.api.nvim_create_user_command(
-        'DVAPDisconnect',
-        M.core.disconnect,
-        {}
-    )
-
-    vim.api.nvim_create_user_command(
-        'DVAPFocus',
-        M.force_focus,
-        {}
-    )
-
-    vim.api.nvim_create_user_command(
-        'DVAPToggleFollow',
-        M.Toggle_follow,
-        {}
-    )
-
-    vim.api.nvim_create_user_command(
-        'DVAPBreakpointList',
-        M.set_breakpoint_qf,
-        {}
-    )
-
-    vim.api.nvim_create_user_command(
-        'DVAPThreadList',
-        M.set_thread_qf,
-        {}
-    )
-
-    vim.api.nvim_create_user_command(
-        'DVAPGetPathLine',
-        copy_path_with_line,
-        {}
-    )
+    vim.api.nvim_create_user_command('DVAPConnect',      M.connectCMD,      {})
+    vim.api.nvim_create_user_command('DVAPDisconnect',   M.disconnect_cmd,  {})
+    vim.api.nvim_create_user_command('DVAPFocus',        M.force_focus,     {})
+    vim.api.nvim_create_user_command('DVAPToggleFollow', M.Toggle_follow,   {})
+    vim.api.nvim_create_user_command('DVAPBreakpointList', M.set_breakpoint_qf, {})
+    vim.api.nvim_create_user_command('DVAPThreadList',   M.set_thread_qf,   {})
+    vim.api.nvim_create_user_command('DVAPGetPathLine',  copy_path_with_line, {})
 
     if M.config.set_default_keymaps then
         vim.keymap.set("n", "<leader>dc",  "<cmd>DVAPConnect<CR>")
@@ -301,7 +320,6 @@ function M.setup(config)
         vim.keymap.set("n", "<leader>dt",  "<cmd>DVAPToggleFollow<CR>")
         vim.keymap.set("n", "<leader>df",  "<cmd>DVAPFocus<CR>")
         vim.keymap.set("n", "<leader>dp",  "<cmd>DVAPGetPathLine<CR>")
-
         vim.keymap.set("n", "<leader>dqb", "<cmd>DVAPBreakpointList<CR>")
         vim.keymap.set("n", "<leader>dqt", "<cmd>DVAPThreadList<CR>")
     end
@@ -310,6 +328,4 @@ function M.setup(config)
     vim.fn.sign_define("DVAP_breakpoint_conditional",   { text = "C", texthl = "Character" })
 end
 
--- Return the module
 return M
-
