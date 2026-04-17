@@ -33,13 +33,6 @@ local M = {
 function M.highlight_current_line(thread_num, file_path, line_number)
     local bufnr = vim.fn.bufadd(file_path)
     vim.fn.bufload(bufnr)
-    local ok
-
-    ok, line_number = pcall(tonumber, line_number)
-    if not ok then
-        print("Warn: failed to find thread file location")
-        return;
-    end
 
     ok, _ = pcall(vim.api.nvim_buf_set_extmark, bufnr, M.DVAP_namespace, line_number - 1, 0, {
         line_hl_group = M.config.threadline_hl,
@@ -189,9 +182,7 @@ function M.set_breakpoint_qf()
         table.insert(qf_items, {
             filename = item.file_path,
             lnum = item.line,
-            text = string.format("[%s] Enabled: %s, Cond: %s",
-                                 item.type_str, item.enabled, item.nonconditional),
-            type = item.type_str:sub(1,1):upper() -- Опционально: первая буква типа (E, W, etc.)
+            text = string.format("Enabled: %s, Cond: %s", item.enabled, item.nonconditional),
         })
     end
 

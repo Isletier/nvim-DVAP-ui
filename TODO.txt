@@ -1,0 +1,11 @@
+add additional text when inserting threads to qf of which one is selected
+add additional highlight to distinguish selected thread highlight from others
+add additional highlight for cursor line to distinguish follow and non-follow mode
+add additional highlight for 'losted' thread
+change default port to 56789
+add virtual text inline thread info?
+
+think about inserting stacktrace of current thread to qf, additional highlight for each call point?
+think about path substitution file/setting? Research how DAP handles remote debugging in the case of different paths
+add periodical polling on current port to auto reconnect?
+
