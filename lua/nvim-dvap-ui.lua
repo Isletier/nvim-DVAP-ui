@@ -4,8 +4,6 @@
 --- paints thread positions, breakpoints, and a session-wide CursorLine accent
 --- while a debug session is connected. Provides user commands and keymaps for
 --- connect/disconnect, follow-mode, and quickfix views of threads/breakpoints.
----
---- Public entry point: require('nvim-dvap-ui').setup(config)
 
 local function setup_default_highlights()
     vim.api.nvim_set_hl(0, "dvap_CursorLine",       { bg = '#1c455a',                   default = true })
