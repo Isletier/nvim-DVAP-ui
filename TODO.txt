@@ -1,9 +1,0 @@
-add additional highlight to distinguish selected thread highlight from others - test
-add configuration points to each one of new highlights - test
-
-add virtual text inline thread info? - try suppress other virtual text
-add periodical polling on current port to auto reconnect?
-
-think about inserting stacktrace of current thread to qf, additional highlight for each call point?
-think about path substitution file/setting? Research how DAP handles remote debugging in the case of different paths
-

@@ -1,9 +1,9 @@
 local function setup_default_highlights()
-    vim.api.nvim_set_hl(0, "dvap_CursorLine",       { bg = '#1c455a' })
-    vim.api.nvim_set_hl(0, "dvap_FollowCursorLine", { bg = '#163546' })
-    vim.api.nvim_set_hl(0, "dvap_SelectedThread",   { bg = '#474728' })
-    vim.api.nvim_set_hl(0, "dvap_ThreadLine",       { bg = '#4e3112' })
-    vim.api.nvim_set_hl(0, "dvap_LostThread",       { bg = '#313d4d', fg = '#888888' })
+    vim.api.nvim_set_hl(0, "dvap_CursorLine",       { bg = '#1c455a',                   default = true })
+    vim.api.nvim_set_hl(0, "dvap_FollowCursorLine", { bg = '#163546',                   default = true })
+    vim.api.nvim_set_hl(0, "dvap_SelectedThread",   { bg = '#474728',                   default = true })
+    vim.api.nvim_set_hl(0, "dvap_ThreadLine",       { bg = '#4e3112',                   default = true })
+    vim.api.nvim_set_hl(0, "dvap_LostThread",       { bg = '#313d4d', fg = '#888888',   default = true })
 end
 
 setup_default_highlights()
@@ -12,24 +12,15 @@ local default_config = {
     default_host = "127.0.0.1",
     default_port = 56789,
 
-    debug_cursorline_hl  = "dvap_CursorLine",
-    follow_cursorline_hl = "dvap_FollowCursorLine",
-
-    breakpoint_unconditional_sign = "DVAP_breakpoint_unconditional",
-    breakpoint_conditional_sign   = "DVAP_breakpoint_conditional",
-
     set_default_keymaps = true,
-
-    threadline_hl          = "dvap_ThreadLine",
-    selected_threadline_hl = "dvap_SelectedThread",
-    lost_threadline_hl     = "dvap_LostThread",
-
     virt_text_thread_info = true,
 
-    follow_mode = true,
+    follow_mode    = true,
+    default_reconnect_interval = 500,
 }
 
 local M = {
+    ---@type DvapModule?
     core = nil,
 
     thread_buf_cache        = {},
@@ -48,9 +39,7 @@ local M = {
 }
 
 function M.update_cursorline_hl()
-    local hl = M.thread_follow_selected
-        and M.config.follow_cursorline_hl
-        or  M.config.debug_cursorline_hl
+    local hl = M.thread_follow_selected and "dvap_FollowCursorLine" or "dvap_CursorLine"
     vim.api.nvim_set_hl(0, 'CursorLine', { link = hl })
 end
 
@@ -60,11 +49,11 @@ function M.highlight_current_line(thread_id, thread, is_selected)
 
     local hl_group
     if thread.lost then
-        hl_group = M.config.lost_threadline_hl
+        hl_group = "dvap_LostThread"
     elseif is_selected then
-        hl_group = M.config.selected_threadline_hl
+        hl_group = "dvap_SelectedThread"
     else
-        hl_group = M.config.threadline_hl
+        hl_group = "dvap_ThreadLine"
     end
 
     local virt_text = nil
@@ -82,6 +71,7 @@ function M.highlight_current_line(thread_id, thread, is_selected)
         hl_mode       = "combine",
         virt_text     = virt_text,
         virt_text_pos = "eol",
+        priority      = is_selected and 300 or 100,
     })
 
     if not ok then
@@ -146,8 +136,8 @@ function M.render(state)
     vim.fn.sign_unplace("DVAP_sign_group")
     for _, breakpoint in pairs(breakpoints) do
         local b_sign = (breakpoint.nonconditional and breakpoint.enabled)
-            and M.config.breakpoint_unconditional_sign
-            or  M.config.breakpoint_conditional_sign
+            and "DVAP_breakpoint_unconditional"
+            or  "DVAP_breakpoint_conditional"
 
         local bufnr = vim.fn.bufnr(breakpoint.file_path)
         if bufnr ~= -1 then
@@ -179,6 +169,7 @@ function M.reset_ui()
 
     vim.opt.cursorline = M.cursor_line_opt_cache
     if M.cursor_line_hl_cache then
+        ---@diagnostic disable-next-line: param-type-mismatch
         vim.api.nvim_set_hl(0, 'CursorLine', M.cursor_line_hl_cache)
     end
 
@@ -186,24 +177,48 @@ function M.reset_ui()
 end
 
 function M.connectCMD()
-    vim.ui.input({
-        prompt  = 'Enter DVAP endpoint {host}:{port}/events ',
-        default = M.config.default_host .. ':' .. M.config.default_port .. "/events",
-    }, function(endpoint)
-        if not endpoint then return end
+    local default_input = string.format("%s:%d/events %d",
+        M.config.default_host,
+        M.config.default_port,
+        M.config.default_reconnect_interval)
 
-        local host, port = string.match(endpoint, "([^:]+):(%d+)/events$")
-        if not host or not port then
-            print("\nError: Endpoint must follow the format 'host:port/events'")
+    vim.ui.input({
+        prompt  = 'Enter endpoint {host}:{port}/events [retry_interval_ms] ',
+        default = default_input,
+    }, function(input)
+        if not input then
+            vim.notify("[DVAP] Error: missing endpoint", vim.log.levels.ERROR)
             return
         end
 
-        M.core.connect(endpoint)
+        local url, rest = input:match("^(%S+)%s*(.-)%s*$")
+        if not url then
+            vim.notify("[DVAP] Error: missing endpoint", vim.log.levels.ERROR)
+            return
+        end
+
+        local host, port = url:match("([^:]+):(%d+)/events$")
+        if not host or not port then
+            vim.notify("[DVAP] Error: endpoint must be 'host:port/events'", vim.log.levels.ERROR)
+            return
+        end
+
+        local interval = 0
+        if rest ~= "" then
+            local interv = tonumber(rest)
+            if not interv or interv < 0 or interv ~= math.floor(interv) then
+                vim.notify("[DVAP] Error: expected a positive integer (ms) after endpoint, got '" .. rest .. "'", vim.log.levels.ERROR)
+                return
+            end
+            interval = interv
+        end
+
+        M.core.connect_entry(url, interval)
     end)
 end
 
 function M.disconnect_cmd()
-    M.core.disconnect()
+    M.core.disconnect_entry()
 end
 
 function M.Toggle_follow()
@@ -247,17 +262,25 @@ function M.set_thread_qf()
     local threads = state.threads
 
     local qf_items = {}
+    local qf_rest  = {}
     for id, item in pairs(threads) do
         local flags = ""
         if id == state.selected then flags = flags .. " [SELECTED]" end
         if item.lost            then flags = flags .. " [LOST]"     end
 
-        table.insert(qf_items, {
+        local entry = {
             filename = item.file_path,
             lnum     = item.line,
             text     = string.format("%s tid:%s%s", id, item.tid, flags),
-        })
+        }
+
+        if id == state.selected then
+            table.insert(qf_items, entry)
+        else
+            table.insert(qf_rest, entry)
+        end
     end
+    vim.list_extend(qf_items, qf_rest)
 
     local qf_id = vim.fn.getqflist({ id = 0 }).id
     if M.QF_thread_id_cache ~= nil and M.QF_thread_id_cache == qf_id then
@@ -301,9 +324,10 @@ function M.setup(config)
     M.config = vim.tbl_deep_extend("force", default_config, config or {})
 
     M.core.setup({
-        on_connected     = M.start_ui_render,
-        on_disconnected  = M.reset_ui,
-        on_state_updated = M.render,
+        on_connected       = M.start_ui_render,
+        on_disconnected    = M.reset_ui,
+        on_state_updated   = M.render,
+        reconnect_interval = M.config.default_reconnect_interval,
     })
 
     vim.api.nvim_create_user_command('DVAPConnect',      M.connectCMD,      {})
