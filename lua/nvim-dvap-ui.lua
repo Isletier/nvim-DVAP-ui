@@ -1,9 +1,9 @@
 local function setup_default_highlights()
-    vim.api.nvim_set_hl(0, "dvap_CursorLine",       { bg = '#19435b' })
-    vim.api.nvim_set_hl(0, "dvap_FollowCursorLine", { bg = '#194b2e' })
-    vim.api.nvim_set_hl(0, "dvap_ThreadLine",       { bg = '#2a4a2a' })
-    vim.api.nvim_set_hl(0, "dvap_SelectedThread",   { bg = '#1a5a1a' })
-    vim.api.nvim_set_hl(0, "dvap_LostThread",       { bg = '#4a3a1a', fg = '#888888' })
+    vim.api.nvim_set_hl(0, "dvap_CursorLine",       { bg = '#1c455a' })
+    vim.api.nvim_set_hl(0, "dvap_FollowCursorLine", { bg = '#163546' })
+    vim.api.nvim_set_hl(0, "dvap_SelectedThread",   { bg = '#474728' })
+    vim.api.nvim_set_hl(0, "dvap_ThreadLine",       { bg = '#4e3112' })
+    vim.api.nvim_set_hl(0, "dvap_LostThread",       { bg = '#313d4d', fg = '#888888' })
 end
 
 setup_default_highlights()
@@ -36,8 +36,8 @@ local M = {
     thread_watch_pos_cache  = { "", 0 },
     thread_follow_selected  = false,
 
-    cursor_line_opt_cache = nil,
-    cursor_line_hl_cache  = nil,
+    cursor_line_opt_cache   = nil,
+    cursor_line_hl_cache    = nil,
 
     QF_breakpoint_id_cache = nil,
     QF_thread_id_cache     = nil,
