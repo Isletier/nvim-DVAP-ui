@@ -23,25 +23,29 @@ setup_default_highlights()
 ---@field follow_mode                boolean  Start the session in follow mode
 ---@field virt_text_thread_info      boolean  Render thread id/tid as EOL virtual text
 ---@field set_default_keymaps        boolean  Register the default <leader>d* keymaps
+---@field switch_to_absolute_number  boolean  Switch to absolute numeration of current buffer once entering "Debug mode"
 
 ---@type DvapUIConfig
 local default_config = {
-    default_host          = "127.0.0.1",
-    default_port          = 56789,
-    reconnect_interval    = 500,
-    follow_mode           = true,
-    virt_text_thread_info = true,
-    set_default_keymaps   = true,
+    default_host                = "127.0.0.1",
+    default_port                = 56789,
+    reconnect_interval          = 500,
+    follow_mode                 = true,
+    virt_text_thread_info       = true,
+    set_default_keymaps         = true,
+    switch_to_absolute_number   = true
 }
 
 
 ---@class DvapUIModule
----@field core                   DvapModule?
----@field config                 DvapUIConfig
----@field thread_buf_cache       table<string, integer>
----@field thread_watch_pos_cache { [1]: string, [2]: integer }
----@field thread_follow_selected boolean
----@field DVAP_namespace         integer
+---@field core                          DvapModule?
+---@field config                        DvapUIConfig
+---@field thread_buf_cache              table<string, integer>
+---@field thread_watch_pos_cache        { [1]: string, [2]: integer }
+---@field thread_follow_selected        boolean
+---@field DVAP_namespace                integer
+---@field number_option_save            boolean
+---@field relative_number_option_save   boolean
 local M = {
     core = nil,
 
@@ -56,6 +60,9 @@ local M = {
     QF_thread_id_cache     = nil,
 
     DVAP_namespace = vim.api.nvim_create_namespace("dvap"),
+
+    number_option_save = false,
+    relative_number_option_save = false,
 
     config = default_config,
 }
@@ -208,6 +215,14 @@ function M.start_ui_render()
     M.cursor_line_opt_cache  = vim.opt.cursorline
     M.cursor_line_hl_cache   = vim.api.nvim_get_hl(0, { name = 'CursorLine' })
     M.thread_follow_selected = M.config.follow_mode
+
+    if M.config.switch_to_absolute_number then
+        M.number_option_save = vim.opt.number
+        M.relative_number_option_save = vim.opt.relativenumber
+        vim.opt.number = true
+        vim.opt.relativenumber = false
+    end
+
     M.update_cursorline_hl()
 end
 
@@ -228,6 +243,11 @@ function M.reset_ui()
     end
 
     vim.fn.sign_unplace("DVAP_sign_group")
+
+    if M.config.switch_to_absolute_number then
+        vim.opt.number = M.number_option_save
+        vim.opt.relativenumber = M.relative_number_option_save
+    end
 end
 
 
@@ -442,3 +462,4 @@ function M.setup(config)
 end
 
 return M
+
